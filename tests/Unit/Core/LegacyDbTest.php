@@ -63,6 +63,7 @@ class LegacyDbTest extends \OxidTestCase
         $oLegacyDb = $this->getMock("oxLegacyDb", array("getDb"));
         $oLegacyDb->expects($this->once())->method('getDb')->with($this->equalTo(false))->will($this->returnValue($oDbLib));
 
+        //must read from master, see ESDEV-3804 for details
         $oLegacyDb->getOne('query', false, false);
     }
 
@@ -77,6 +78,7 @@ class LegacyDbTest extends \OxidTestCase
         $oLegacyDb = $this->getMock("oxLegacyDb", array("getDb"));
         $oLegacyDb->expects($this->once())->method('getDb')->with($this->equalTo(false))->will($this->returnValue($oDbLib));
 
+        //must read from master, see ESDEV-3804 for details
         $oLegacyDb->getRow('query', false, false);
     }
 
@@ -91,6 +93,7 @@ class LegacyDbTest extends \OxidTestCase
         $oLegacyDb = $this->getMock("oxLegacyDb", array("getDb"));
         $oLegacyDb->expects($this->once())->method('getDb')->with($this->equalTo(false))->will($this->returnValue($oDbLib));
 
+        //must read from master, see ESDEV-3804 for details
         $oLegacyDb->getAll('query', false, false);
     }
 
@@ -105,6 +108,7 @@ class LegacyDbTest extends \OxidTestCase
         $oLegacyDb = $this->getMock("oxLegacyDb", array("getDb"));
         $oLegacyDb->expects($this->once())->method('getDb')->with($this->equalTo(false))->will($this->returnValue($oDbLib));
 
+        //must read from master, see ESDEV-3804 for details
         $oLegacyDb->select('query', false, false);
     }
 
@@ -119,6 +123,7 @@ class LegacyDbTest extends \OxidTestCase
         $oLegacyDb = $this->getMock("oxLegacyDb", array("getDb"));
         $oLegacyDb->expects($this->once())->method('getDb')->with($this->equalTo(false))->will($this->returnValue($oDbLib));
 
+        //must read from master, see ESDEV-3804 for details
         $oLegacyDb->getCol('query', false, false);
     }
 
@@ -133,6 +138,7 @@ class LegacyDbTest extends \OxidTestCase
         $oLegacyDb = $this->getMock("oxLegacyDb", array("getDb"));
         $oLegacyDb->expects($this->once())->method('getDb')->with($this->equalTo(false))->will($this->returnValue($oDbLib));
 
+        //must read from master, see ESDEV-3804 for details
         $oLegacyDb->selectLimit('query', -1, -1, false, false);
     }
 

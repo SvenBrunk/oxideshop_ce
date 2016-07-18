@@ -147,6 +147,7 @@ class UtilsPic extends \oxSuperCfg
         }
 
         $oDb = oxDb::getDb();
+        //must read from master, see ESDEV-3804 for details
         $iCountUsed = $oDb->getOne("select count(*) from $sTable where $sField = " . $oDb->quote($sPicName) . " group by $sField ", false, false);
 
         return $iCountUsed > 1 ? false : true;

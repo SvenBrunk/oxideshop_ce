@@ -286,6 +286,7 @@ class AdminView extends \oxView
 
         if ($sShopID = $myConfig->getShopId()) {
             $sQ = "select oxversion from oxshops where oxid = '$sShopID' ";
+            //must read from master, see ESDEV-3804 for details
             $sVersion = oxDb::getDb()->getOne($sQ, false, false);
         }
 
@@ -525,6 +526,7 @@ class AdminView extends \oxView
             if (false !== $iEnglishId) {
                 $sViewName = getViewName("oxcountry", $iEnglishId);
                 $sQ = "select oxtitle from {$sViewName} where oxisoalpha2 = " . oxDb::getDb()->quote($sCountryCode);
+                //must read from master, see ESDEV-3804 for details
                 $sCountryName = oxDb::getDb()->getOne($sQ, false, false);
                 if ($sCountryName) {
                     $sCountry = $sCountryName;
