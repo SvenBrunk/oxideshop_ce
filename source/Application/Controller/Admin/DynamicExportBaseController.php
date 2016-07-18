@@ -879,7 +879,7 @@ class DynamicExportBaseController extends \oxAdminDetails
      */
     protected function _initArticle($sHeapTable, $iCnt, & $blContinue)
     {
-        $oRs = oxDb::getDb()->selectLimit("select oxid from $sHeapTable", 1, $iCnt);
+        $oRs = $this->getDb()->selectLimit("select oxid from $sHeapTable", 1, $iCnt);
         if ($oRs != false && $oRs->count() > 0) {
             $oArticle = oxNew('oxArticle');
             $oArticle->setLoadParentData(true);
@@ -950,5 +950,15 @@ class DynamicExportBaseController extends \oxAdminDetails
     protected function updateArticle($article)
     {
         return $article;
+    }
+
+    /**
+     * Get the actual database.
+     * 
+     * @return \OxidEsales\Eshop\Core\Database\Adapter\DatabaseInterface The database.
+     */
+    protected function getDb()
+    {
+        return oxDb::getDb();
     }
 }
