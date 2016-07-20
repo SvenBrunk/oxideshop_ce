@@ -108,7 +108,7 @@ class Database implements DatabaseInterface
      *
      * @throws DatabaseConnectionException If a connection to the database cannot be established
      */
-    public function connect()
+    public function connect($forceMaster = false)
     {
         $connection = null;
 
@@ -123,7 +123,7 @@ class Database implements DatabaseInterface
 
         try {
             $connection = DriverManager::getConnection($connectionParameters, $configuration);
-            $connection->connect();
+            $forceMaster ? $connection->connect('master') : $connection->connect();
             if (! $connection->isConnected()) {
                 $dsn = $connection->getDriver()->getName() .
                        '://' .
@@ -149,7 +149,7 @@ class Database implements DatabaseInterface
     {
         $this->connection->close();
     }
-    
+
     /**
      * Set connection
      *
@@ -323,7 +323,7 @@ class Database implements DatabaseInterface
     /**
      * Quote a string in a way that it can be used as a identifier (i.e. table name or field name) in a SQL statement.
      *
-     * @param string $string The string to be quoted as a identifier. 
+     * @param string $string The string to be quoted as a identifier.
      *
      * @return string The quoted string
      */
