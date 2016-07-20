@@ -117,29 +117,31 @@ class DatabaseTest extends UnitTestCase
         $this->getConnectionSlave();
     }
 
+    /** Assure that replication works at all */
     public function testBasicMasterSlaveFunctionality()
     {
         /**
          * Arrange
          */
-        $expectedMasterResult = 1;
+        $expectedMasterResult = '1';
 
         /** Insert record  to the master database */
         $this->masterConnection->query('INSERT INTO `master_slave_table` (`column1`, `column2`) VALUES (' . $expectedMasterResult . ', 2)');
-
+        /** Pause to let replication take place */
         sleep(2);
+
         /**
          * Act
          */
         /** @var \mysqli_result $resultSet Read directly from slave database */
         $resultSet = $this->slaveConnection->query('SELECT column1 FROM `master_slave_table` WHERE id = 1');
         $row = $resultSet->fetch_assoc();
-        $actualSlaveResult = (int) $row['column1'];
+        $actualSlaveResult = $row['column1'];
 
         /** @var \mysqli_result $resultSet Read directly from master database */
         $resultSet = $this->masterConnection->query('SELECT column1 FROM `master_slave_table` WHERE id = 1');
         $row = $resultSet->fetch_assoc();
-        $actualMasterResult = (int) $row['column1'];
+        $actualMasterResult = $row['column1'];
 
         /**
          * Assert
@@ -148,35 +150,40 @@ class DatabaseTest extends UnitTestCase
         $this->assertSame($expectedMasterResult, $actualMasterResult, 'Master connection retrieves record inserted into master database');
     }
 
-    public function testMasterSlaveConnectionUsesSlaveForReadingAsDefault()
+    /**
+     * Test Doctrine behavior:
+     * "Use slave if master was never picked before and ONLY if 'getWrappedConnection' or 'executeQuery' is used."
+     *  \OxidEsales\Eshop\Core\Database\Adapter\Doctrine\Database::getAll uses executeQuery under the hood to retrieve the results.
+     *
+     * @covers \OxidEsales\Eshop\Core\Database\Adapter\Doctrine\Database::getAll
+     */
+    public function testMasterSlaveConnectionReadsFromSlaveOnGetAll()
     {
         /**
          * Act
          */
-        $expectedSlaveResult = 100;
-        $expectedMasterResult = 1;
+        $expectedSlaveResult = '100';
+        $expectedMasterResult = '1';
 
         /** Insert record using master-slave replication */
-        $this->masterSlaveConnection->execute('INSERT INTO `master_slave_table` (`column1`, `column2`) VALUES (' . $expectedMasterResult . ', 2)');
+        $this->masterConnection->query('INSERT INTO `master_slave_table` (`column1`, `column2`) VALUES (' . $expectedMasterResult . ', 2)');
+        /** Pause to let replication take place */
+        sleep(2);
 
         /** Modify record directly on the slave database, bypassing master-slave replication */
         $this->slaveConnection->query('UPDATE `master_slave_table` SET `column1` = ' . $expectedSlaveResult . ' WHERE id = 1');
 
-
         /** @var \mysqli_result $resultSet Read directly from slave database */
         $resultSet = $this->slaveConnection->query('SELECT column1 FROM `master_slave_table` WHERE id = 1');
         $row = $resultSet->fetch_assoc();
-        $actualSlaveResult = (int) $row['column1'];
+        $actualSlaveResult = $row['column1'];
 
         /** @var \mysqli_result $resultSet Read directly from master database */
         $resultSet = $this->masterConnection->query('SELECT column1 FROM `master_slave_table` WHERE id = 1');
         $row = $resultSet->fetch_assoc();
-        $actualMasterResult = (int) $row['column1'];
+        $actualMasterResult =  $row['column1'];
 
-        /** @var  Database\Adapter\ResultSetInterface $resultSet */
-        $resultSet = $this->masterSlaveConnection->select('SELECT column1 FROM `master_slave_table` WHERE id = 1');
-        var_dump($resultSet);
-        $actualMasterSlaveResult = (int) $resultSet->fields['column1'];
+        $actualMasterSlaveResult = $this->masterSlaveConnection->getAll('SELECT column1 FROM `master_slave_table` WHERE id = 1')['column1'];
 
         /**
          * Assert
@@ -186,16 +193,25 @@ class DatabaseTest extends UnitTestCase
         $this->assertSame($expectedSlaveResult, $actualMasterSlaveResult, 'Master-Slave connection retrieves modified value ' . $expectedSlaveResult . ' from slave database');
     }
 
-    public function testMasterSlaveConnectionUsesMasterForReadingDuringTransaction()
+    /**
+     * Test Doctrine behavior:
+     * "Use slave if master was never picked before and ONLY if 'getWrappedConnection' or 'executeQuery' is used."
+     *  \OxidEsales\Eshop\Core\Database\Adapter\Doctrine\Database::getCol uses executeQuery under the hood to retrieve the results.
+     *
+     * @covers \OxidEsales\Eshop\Core\Database\Adapter\Doctrine\Database::getCol
+     */
+    public function testMasterSlaveConnectionReadsFromSlaveOnGetCol()
     {
         /**
          * Act
          */
-        $expectedSlaveResult = 100;
-        $expectedMasterSlaveResult = 1;
+        $expectedSlaveResult = '100';
+        $expectedMasterResult = '1';
 
         /** Insert record using master-slave replication */
-        $this->masterSlaveConnection->execute('INSERT INTO `master_slave_table` (`column1`, `column2`) VALUES (' . $expectedMasterSlaveResult . ', 2)');
+        $this->masterConnection->query('INSERT INTO `master_slave_table` (`column1`, `column2`) VALUES (' . $expectedMasterResult . ', 2)');
+        /** Pause to let replication take place */
+        sleep(2);
 
         /** Modify record directly on the slave database, bypassing master-slave replication */
         $this->slaveConnection->query('UPDATE `master_slave_table` SET `column1` = ' . $expectedSlaveResult . ' WHERE id = 1');
@@ -203,27 +219,202 @@ class DatabaseTest extends UnitTestCase
         /** @var \mysqli_result $resultSet Read directly from slave database */
         $resultSet = $this->slaveConnection->query('SELECT column1 FROM `master_slave_table` WHERE id = 1');
         $row = $resultSet->fetch_assoc();
-        $actualSlaveResult = (int) $row['column1'];
+        $actualSlaveResult = $row['column1'];
 
         /** @var \mysqli_result $resultSet Read directly from master database */
         $resultSet = $this->masterConnection->query('SELECT column1 FROM `master_slave_table` WHERE id = 1');
         $row = $resultSet->fetch_assoc();
-        $actualMasterResult = (int) $row['column1'];
+        $actualMasterResult = $row['column1'];
+
+        $actualMasterSlaveResult = $this->masterSlaveConnection->getCol('SELECT column1 FROM `master_slave_table` WHERE id = 1')[0];
+
+        /**
+         * Assert
+         */
+        $this->assertSame($expectedSlaveResult, $actualSlaveResult, 'Slave connection retrieves modified value ' . $expectedSlaveResult);
+        $this->assertSame($expectedMasterResult, $actualMasterResult, 'Master connection retrieves unmodified value ' . $expectedSlaveResult);
+        $this->assertSame($expectedSlaveResult, $actualMasterSlaveResult, 'Master-Slave connection retrieves modified value ' . $expectedSlaveResult . ' from slave database');
+    }
+
+    /**
+     * Test Doctrine behavior:
+     * "Use slave if master was never picked before and ONLY if 'getWrappedConnection' or 'executeQuery' is used."
+     *  \OxidEsales\Eshop\Core\Database\Adapter\Doctrine\Database::getRow uses executeQuery under the hood to retrieve the results.
+     *
+     * @covers \OxidEsales\Eshop\Core\Database\Adapter\Doctrine\Database::getRow
+     */
+    public function testMasterSlaveConnectionReadsFromSlaveOnGetRow()
+    {
+        /**
+         * Act
+         */
+        $expectedSlaveResult = '100';
+        $expectedMasterResult = '1';
+
+        /** Insert record using master-slave replication */
+        $this->masterConnection->query('INSERT INTO `master_slave_table` (`column1`, `column2`) VALUES (' . $expectedMasterResult . ', 2)');
+        /** Pause to let replication take place */
+        sleep(2);
+
+        /** Modify record directly on the slave database, bypassing master-slave replication */
+        $this->slaveConnection->query('UPDATE `master_slave_table` SET `column1` = ' . $expectedSlaveResult . ' WHERE id = 1');
+
+        /** @var \mysqli_result $resultSet Read directly from slave database */
+        $resultSet = $this->slaveConnection->query('SELECT column1 FROM `master_slave_table` WHERE id = 1');
+        $row = $resultSet->fetch_assoc();
+        $actualSlaveResult = $row['column1'];
+
+        /** @var \mysqli_result $resultSet Read directly from master database */
+        $resultSet = $this->masterConnection->query('SELECT column1 FROM `master_slave_table` WHERE id = 1');
+        $row = $resultSet->fetch_assoc();
+        $actualMasterResult =  $row['column1'];
+
+        $actualMasterSlaveResult = $this->masterSlaveConnection->getRow('SELECT column1 FROM `master_slave_table` WHERE id = 1')['column1'];
+
+        /**
+         * Assert
+         */
+        $this->assertSame($expectedSlaveResult, $actualSlaveResult, 'Slave connection retrieves modified value ' . $expectedSlaveResult);
+        $this->assertSame($expectedMasterResult, $actualMasterResult, 'Master connection retrieves unmodified value ' . $expectedSlaveResult);
+        $this->assertSame($expectedSlaveResult, $actualMasterSlaveResult, 'Master-Slave connection retrieves modified value ' . $expectedSlaveResult . ' from slave database');
+    }
+
+    /**
+     * Test Doctrine behavior:
+     * "Use slave if master was never picked before and ONLY if 'getWrappedConnection' or 'executeQuery' is used."
+     *  \OxidEsales\Eshop\Core\Database\Adapter\Doctrine\Database::select uses executeQuery to retrieve the results.
+     *
+     * @covers \OxidEsales\Eshop\Core\Database\Adapter\Doctrine\Database::select
+     */
+    public function testMasterSlaveConnectionReadsFromSlaveOnSelect()
+    {
+        /**
+         * Act
+         */
+        $expectedSlaveResult = '100';
+        $expectedMasterResult = '1';
+
+        /** Insert record using master-slave replication */
+        $this->masterConnection->query('INSERT INTO `master_slave_table` (`column1`, `column2`) VALUES (' . $expectedMasterResult . ', 2)');
+        /** Pause to let replication take place */
+        sleep(2);
+
+        /** Modify record directly on the slave database, bypassing master-slave replication */
+        $this->slaveConnection->query('UPDATE `master_slave_table` SET `column1` = ' . $expectedSlaveResult . ' WHERE id = 1');
+
+        /** @var \mysqli_result $resultSet Read directly from slave database */
+        $resultSet = $this->slaveConnection->query('SELECT column1 FROM `master_slave_table` WHERE id = 1');
+        $row = $resultSet->fetch_assoc();
+        $actualSlaveResult = $row['column1'];
+
+        /** @var \mysqli_result $resultSet Read directly from master database */
+        $resultSet = $this->masterConnection->query('SELECT column1 FROM `master_slave_table` WHERE id = 1');
+        $row = $resultSet->fetch_assoc();
+        $actualMasterResult = $row['column1'];
+
+        /** @var  Database\Adapter\ResultSetInterface $resultSet */
+        $resultSet = $this->masterSlaveConnection->select('SELECT column1 FROM `master_slave_table` WHERE id = 1');
+        $actualMasterSlaveResult = $resultSet->fields['column1'];
+
+        /**
+         * Assert
+         */
+        $this->assertSame($expectedSlaveResult, $actualSlaveResult, 'Slave connection retrieves modified value ' . $expectedSlaveResult);
+        $this->assertSame($expectedMasterResult, $actualMasterResult, 'Master connection retrieves unmodified value ' . $expectedSlaveResult);
+        $this->assertSame($expectedSlaveResult, $actualMasterSlaveResult, 'Master-Slave connection retrieves modified value ' . $expectedSlaveResult . ' from slave database');
+    }
+
+    /**
+     * Test Doctrine behavior:
+     * "Master is picked when 'exec', 'executeUpdate', 'insert', 'delete', 'update', 'createSavepoint', 'releaseSavepoint', 'beginTransaction', 'rollback', 'commit', 'query' or 'prepare' is called."
+     * "Use slave if master was never picked before and ONLY if 'getWrappedConnection' or 'executeQuery' is used."
+     *
+     *  \OxidEsales\Eshop\Core\Database\Adapter\Doctrine\Database::select uses executeQuery to retrieve the results.
+     * Now picking the master is forced by using 'executeUpdate' and then the master should also be also used for
+     * \OxidEsales\Eshop\Core\Database\Adapter\Doctrine\Database::select
+     *
+     * @covers \OxidEsales\Eshop\Core\Database\Adapter\Doctrine\Database::select
+     */
+    public function testMasterSlaveConnectionReadsFromMasterOnSelect()
+    {
+        /**
+         * Act
+         */
+        $expectedSlaveResult = '100';
+        $expectedMasterResult = '1';
+
+        /** Insert record using master-slave replication */
+        $this->masterConnection->query('INSERT INTO `master_slave_table` (`column1`, `column2`) VALUES (' . $expectedMasterResult . ', 2)');
+        /** Pause to let replication take place */
+        sleep(2);
+
+        /** Modify record directly on the slave database, bypassing master-slave replication */
+        $this->slaveConnection->query('UPDATE `master_slave_table` SET `column1` = ' . $expectedSlaveResult . ' WHERE id = 1');
+
+        /** @var \mysqli_result $resultSet Read directly from slave database */
+        $resultSet = $this->slaveConnection->query('SELECT column1 FROM `master_slave_table` WHERE id = 1');
+        $row = $resultSet->fetch_assoc();
+        $actualSlaveResult = $row['column1'];
+
+        /** @var \mysqli_result $resultSet Read directly from master database */
+        $resultSet = $this->masterConnection->query('SELECT column1 FROM `master_slave_table` WHERE id = 1');
+        $row = $resultSet->fetch_assoc();
+        $actualMasterResult = $row['column1'];
+
+        /** Force picking the master by doing an execute here. Doctrine:executeUpdate is called under the hood */
+        $this->masterSlaveConnection->execute('INSERT INTO `master_slave_table` (`column1`, `column2`) VALUES (2, 3)');
+        /** @var  Database\Adapter\ResultSetInterface $resultSet */
+        $resultSet = $this->masterSlaveConnection->select('SELECT column1 FROM `master_slave_table` WHERE id = 1');
+        $actualMasterSlaveResult = $resultSet->fields['column1'];
+
+        /**
+         * Assert
+         */
+        $this->assertSame($expectedSlaveResult, $actualSlaveResult, 'Slave connection retrieves modified value ' . $expectedSlaveResult);
+        $this->assertSame($expectedMasterResult, $actualMasterResult, 'Master connection retrieves unmodified value ' . $expectedSlaveResult);
+        $this->assertSame($expectedSlaveResult, $actualMasterSlaveResult, 'Master-Slave connection retrieves unmodified value ' . $expectedMasterResult . ' from master database');
+    }
+
+    public function testMasterSlaveConnectionUsesMasterForReadingDuringTransaction()
+    {
+        /**
+         * Act
+         */
+        $expectedSlaveResult = '100';
+        $expectedMasterResult = '1';
+
+        /** Insert record using master-slave replication */
+        $this->masterConnection->query('INSERT INTO `master_slave_table` (`column1`, `column2`) VALUES (' . $expectedMasterResult . ', 2)');
+        /** Pause to let replication take place */
+        sleep(2);
+
+        /** Modify record directly on the slave database, bypassing master-slave replication */
+        $this->slaveConnection->query('UPDATE `master_slave_table` SET `column1` = ' . $expectedSlaveResult . ' WHERE id = 1');
+
+        /** @var \mysqli_result $resultSet Read directly from slave database */
+        $resultSet = $this->slaveConnection->query('SELECT column1 FROM `master_slave_table` WHERE id = 1');
+        $row = $resultSet->fetch_assoc();
+        $actualSlaveResult = $row['column1'];
+
+        /** @var \mysqli_result $resultSet Read directly from master database */
+        $resultSet = $this->masterConnection->query('SELECT column1 FROM `master_slave_table` WHERE id = 1');
+        $row = $resultSet->fetch_assoc();
+        $actualMasterResult = $row['column1'];
 
         /**
          * Start a transaction and read from the master-slave connection.
          * In this case the modifications on the slave should be invisible
          */
         $this->masterSlaveConnection->startTransaction();
-        $actualMasterSlaveResult = (int) $this->masterSlaveConnection->getOne('SELECT column1 FROM `master_slave_table` WHERE id = 1');
+        $actualMasterSlaveResult = $this->masterSlaveConnection->getOne('SELECT column1 FROM `master_slave_table` WHERE id = 1');
         $this->masterSlaveConnection->commitTransaction();
 
         /**
          * Assert
          */
         $this->assertSame($expectedSlaveResult, $actualSlaveResult, 'Slave connection retrieves modified value ' . $expectedSlaveResult);
-        $this->assertSame($expectedMasterSlaveResult, $actualMasterResult, 'Master connection retrieves unmodified value ' . $expectedMasterSlaveResult);
-        $this->assertSame($expectedMasterSlaveResult, $actualMasterSlaveResult, 'Master-Slave connection retrieves unmodified value ' . $expectedMasterSlaveResult . ' from master database');
+        $this->assertSame($expectedMasterResult, $actualMasterResult, 'Master connection retrieves unmodified value ' . $expectedMasterResult);
+        $this->assertSame($expectedMasterResult, $actualMasterSlaveResult, 'Master-Slave connection retrieves unmodified value ' . $expectedMasterResult . ' from master database');
     }
 
     /**
