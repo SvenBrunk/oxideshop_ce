@@ -22,6 +22,7 @@
 
 namespace OxidEsales\Eshop\Tests\Integration\Core\Database\Adapter;
 
+use oxDb;
 use OxidEsales\Eshop\Core\ConfigFile;
 use OxidEsales\Eshop\Core\Database;
 use OxidEsales\Eshop\Core\Database\Adapter\DatabaseInterface;
@@ -468,10 +469,10 @@ abstract class DatabaseInterfaceImplementationTest extends DatabaseInterfaceImpl
 
         $this->setExpectedException($expectedExceptionClass);
 
-        $this->database->select(
+        $masterDb = oxDb::getMaster();
+        $masterDb->select(
             'SELECT SOME INVALID QUERY',
-            array(),
-            false
+            array()
         );
     }
 
@@ -1405,7 +1406,8 @@ abstract class DatabaseInterfaceImplementationTest extends DatabaseInterfaceImpl
     {
         $sql = "SELECT VARIABLE_VALUE FROM information_schema.session_variables WHERE variable_name = 'tx_isolation';";
 
-        $resultSet = $this->database->select($sql, array(), false);
+        $masterDb = oxDb::getMaster();
+        $resultSet = $masterDb->select($sql, array());
 
         return str_replace('-', ' ', $resultSet->fields[0]);
     }
@@ -1445,8 +1447,10 @@ abstract class DatabaseInterfaceImplementationTest extends DatabaseInterfaceImpl
      */
     protected function fetchAllTestTableRows()
     {
-        return $this->database
-            ->select('SELECT * FROM ' . self::TABLE_NAME, array(), false)
+        $masterDb = oxDb::getMaster();
+        
+        return $masterDb
+            ->select('SELECT * FROM ' . self::TABLE_NAME, array())
             ->fetchAll();
     }
 
@@ -1457,7 +1461,9 @@ abstract class DatabaseInterfaceImplementationTest extends DatabaseInterfaceImpl
      */
     protected function fetchFirstTestTableOxId()
     {
-        $rows = $this->database->select('SELECT OXID FROM ' . self::TABLE_NAME, array(), false);
+        $masterDb = oxDb::getMaster();
+        
+        $rows = $masterDb->select('SELECT OXID FROM ' . self::TABLE_NAME, array());
         $row = $rows->fetchRow();
 
         return $row;

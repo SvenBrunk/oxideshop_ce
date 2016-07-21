@@ -1669,7 +1669,7 @@ class User extends \oxBase
         if (($sOxid = $this->getId())) {
             $sQ .= " and oxid <> " . $masterDb->quote($sOxid);
         }
-        $oRs = $masterDb->select($sQ, false, false);
+        $oRs = $masterDb->select($sQ, false);
         if ($oRs != false && $oRs->count() > 0) {
 
             if ($this->_blMallUsers) {
