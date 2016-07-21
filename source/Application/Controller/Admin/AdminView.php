@@ -287,7 +287,7 @@ class AdminView extends \oxView
         if ($sShopID = $myConfig->getShopId()) {
             $sQ = "select oxversion from oxshops where oxid = '$sShopID' ";
             // We force reading from master to prevent issues with slow replications or open transactions (see ESDEV-3804).
-            $sVersion = oxDb::getMaster()->getOne($sQ, false, false);
+            $sVersion = oxDb::getMaster()->getOne($sQ);
         }
 
         $sVersion = preg_replace("/(^[^0-9]+)(.+)$/", "$2", $sVersion);
@@ -527,7 +527,7 @@ class AdminView extends \oxView
                 $sViewName = getViewName("oxcountry", $iEnglishId);
                 $sQ = "select oxtitle from {$sViewName} where oxisoalpha2 = " . oxDb::getDb()->quote($sCountryCode);
                 // We force reading from master to prevent issues with slow replications or open transactions (see ESDEV-3804).
-                $sCountryName = oxDb::getMaster()->getOne($sQ, false, false);
+                $sCountryName = oxDb::getMaster()->getOne($sQ);
                 if ($sCountryName) {
                     $sCountry = $sCountryName;
                 }
