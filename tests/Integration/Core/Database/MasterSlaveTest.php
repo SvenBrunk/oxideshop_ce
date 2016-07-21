@@ -41,16 +41,16 @@ use OxidEsales\TestingLibrary\UnitTestCase;
  * 3. If master was picked once during the lifetime of the connection it will always get picked afterwards.
  * 4. One slave connection is randomly picked ONCE during a request.
  *
- * This integration test covers all methods of \OxidEsales\Eshop\Core\Database\Adapter\Doctrine\Database that are using
- * one of the before mentioned methods \Doctrine\DBAL\Connection under the hood. Their behavior is determined by the
+ * This integration test suite covers all methods of \OxidEsales\Eshop\Core\Database\Adapter\Doctrine\Database that are using
+ * one of the before mentioned methods of \Doctrine\DBAL\Connection under the hood. Their behavior is determined by the
  * doctrine functions and they should react in the same way.
  *
  * To test the master slave behaviour, 3 database connections are established:
  * - a connection to the slave database
  * - a connection to the master database
- * - a master-slave connection, which is expected to switch between master and slave according the rules before mentioned.
+ * - a master-slave connection, which is expected to switch between master and slave according the rules mentioned before .
  *
- * All test is completely independent form from each other and always start with a fresh database table and fresh connections.
+ * All tests are completely independent from each other and always start with a fresh database table and fresh connections.
  *
  * \Doctrine\DBAL\Connection::executeQuery
  */
@@ -84,6 +84,8 @@ class DatabaseTest extends UnitTestCase
         /**
          * Setup the different connections
          */
+        /** Set db property of Database instance to null to enforce a fresh connection */
+        $this->setProtectedClassProperty(Database::getInstance(), 'db' , null);
         $this->masterSlaveConnection = $this->getConnectionMasterSlave();
         $this->masterConnection = $this->getConnectionMaster();
         $this->slaveConnection = $this->getConnectionSlave();
@@ -99,7 +101,7 @@ class DatabaseTest extends UnitTestCase
 
         $this->expectedMasterResult = '1';
 
-        /** Insert record  to the master database */
+        /** Insert record to the master database */
         $this->populateTestTable($this->expectedMasterResult);
     }
 
@@ -141,14 +143,6 @@ class DatabaseTest extends UnitTestCase
     public function testBasicMasterSlaveFunctionality()
     {
         /**
-         * Arrange
-         */
-
-
-        /** Insert record  to the master database */
-
-
-        /**
          * Act
          */
         /** @var \mysqli_result $resultSet Read directly from slave database */
@@ -178,24 +172,23 @@ class DatabaseTest extends UnitTestCase
          */
         $expectedSlaveResult = '100';
 
-
         /** Modify record directly on the slave database, bypassing master-slave replication */
         $this->slaveConnection->query('UPDATE `master_slave_table` SET `column1` = ' . $expectedSlaveResult . ' WHERE id = 1');
 
         /** @var \mysqli_result $resultSet Read directly from slave database */
-        list($resultSet, $row, $actualSlaveResult) = $this->readValueFromSlaveDb();
+        $actualSlaveResult = $this->readValueFromSlaveDb();
 
         /** @var \mysqli_result $resultSet Read directly from master database */
         $actualMasterResult = $this->readValueFromMasterDb();
 
-        $actualMasterSlaveResult = $this->masterSlaveConnection->getAll('SELECT column1 FROM `master_slave_table` WHERE id = 1')['column1'];
+        $actualMasterSlaveResult = $this->masterSlaveConnection->getAll('SELECT column1 FROM `master_slave_table` WHERE id = 1')[0]['column1'];
 
         /**
          * Assert
          */
         $this->assertSame($expectedSlaveResult, $actualSlaveResult, 'Slave connection retrieves modified value ' . $expectedSlaveResult);
         $this->assertSame($this->expectedMasterResult, $actualMasterResult, 'Master connection retrieves unmodified value ' . $expectedSlaveResult);
-        $this->assertSame($expectedSlaveResult, $actualMasterSlaveResult, 'Master-Slave connection retrieves modified value ' . $expectedSlaveResult . ' from slave database');
+        $this->assertSame($expectedSlaveResult, $actualMasterSlaveResult, 'Master-Slave connection reads from slave database when using getAll()');
     }
 
     /**
@@ -208,16 +201,18 @@ class DatabaseTest extends UnitTestCase
     public function testMasterSlaveConnectionReadsFromSlaveOnGetCol()
     {
         /**
-         * Act
+         * Arrange
          */
         $expectedSlaveResult = '100';
 
-
+        /**
+         * Act
+         */
         /** Modify record directly on the slave database, bypassing master-slave replication */
         $this->slaveConnection->query('UPDATE `master_slave_table` SET `column1` = ' . $expectedSlaveResult . ' WHERE id = 1');
 
         /** @var \mysqli_result $resultSet Read directly from slave database */
-        list($resultSet, $row, $actualSlaveResult) = $this->readValueFromSlaveDb();
+        $actualSlaveResult = $this->readValueFromSlaveDb();
 
         /** @var \mysqli_result $resultSet Read directly from master database */
         $actualMasterResult = $this->readValueFromMasterDb();
@@ -229,7 +224,43 @@ class DatabaseTest extends UnitTestCase
          */
         $this->assertSame($expectedSlaveResult, $actualSlaveResult, 'Slave connection retrieves modified value ' . $expectedSlaveResult);
         $this->assertSame($this->expectedMasterResult, $actualMasterResult, 'Master connection retrieves unmodified value ' . $expectedSlaveResult);
-        $this->assertSame($expectedSlaveResult, $actualMasterSlaveResult, 'Master-Slave connection retrieves modified value ' . $expectedSlaveResult . ' from slave database');
+        $this->assertSame($expectedSlaveResult, $actualMasterSlaveResult, 'Master-Slave connection reads from slave database when using getCol()');
+    }
+
+    /**
+     * Test Doctrine behavior:
+     * "Use slave if master was never picked before and ONLY if 'getWrappedConnection' or 'executeQuery' is used."
+     *  \OxidEsales\Eshop\Core\Database\Adapter\Doctrine\Database::getOne uses executeQuery under the hood to retrieve the results.
+     *
+     * @covers \OxidEsales\Eshop\Core\Database\Adapter\Doctrine\Database::getOne
+     */
+    public function testMasterSlaveConnectionReadsFromSlaveOnGetOne()
+    {
+        /**
+         * Arrange
+         */
+        $expectedSlaveResult = '100';
+
+        /**
+         * Act
+         */
+        /** Modify record directly on the slave database, bypassing master-slave replication */
+        $this->slaveConnection->query('UPDATE `master_slave_table` SET `column1` = ' . $expectedSlaveResult . ' WHERE id = 1');
+
+        /** @var \mysqli_result $resultSet Read directly from slave database */
+        $actualSlaveResult = $this->readValueFromSlaveDb();
+
+        /** @var \mysqli_result $resultSet Read directly from master database */
+        $actualMasterResult = $this->readValueFromMasterDb();
+
+        $actualMasterSlaveResult = $this->masterSlaveConnection->getOne('SELECT column1 FROM `master_slave_table` WHERE id = 1');
+
+        /**
+         * Assert
+         */
+        $this->assertSame($expectedSlaveResult, $actualSlaveResult, 'Slave connection retrieves modified value ' . $expectedSlaveResult);
+        $this->assertSame($this->expectedMasterResult, $actualMasterResult, 'Master connection retrieves unmodified value ' . $expectedSlaveResult);
+        $this->assertSame($expectedSlaveResult, $actualMasterSlaveResult, 'Master-Slave connection reads from slave database when using getOne()');
     }
 
     /**
@@ -242,16 +273,19 @@ class DatabaseTest extends UnitTestCase
     public function testMasterSlaveConnectionReadsFromSlaveOnGetRow()
     {
         /**
-         * Act
+         * Arrange
          */
         $expectedSlaveResult = '100';
 
+        /**
+         * Act
+         */
 
         /** Modify record directly on the slave database, bypassing master-slave replication */
         $this->slaveConnection->query('UPDATE `master_slave_table` SET `column1` = ' . $expectedSlaveResult . ' WHERE id = 1');
 
         /** @var \mysqli_result $resultSet Read directly from slave database */
-        list($resultSet, $row, $actualSlaveResult) = $this->readValueFromSlaveDb();
+        $actualSlaveResult = $this->readValueFromSlaveDb();
 
         /** @var \mysqli_result $resultSet Read directly from master database */
         $actualMasterResult = $this->readValueFromMasterDb();
@@ -263,29 +297,34 @@ class DatabaseTest extends UnitTestCase
          */
         $this->assertSame($expectedSlaveResult, $actualSlaveResult, 'Slave connection retrieves modified value ' . $expectedSlaveResult);
         $this->assertSame($this->expectedMasterResult, $actualMasterResult, 'Master connection retrieves unmodified value ' . $expectedSlaveResult);
-        $this->assertSame($expectedSlaveResult, $actualMasterSlaveResult, 'Master-Slave connection retrieves modified value ' . $expectedSlaveResult . ' from slave database');
+        $this->assertSame($expectedSlaveResult, $actualMasterSlaveResult, 'Master-Slave connection reads from slave database when using getRow()');
     }
 
     /**
      * Test Doctrine behavior:
      * "Use slave if master was never picked before and ONLY if 'getWrappedConnection' or 'executeQuery' is used."
-     *  \OxidEsales\Eshop\Core\Database\Adapter\Doctrine\Database::select uses executeQuery to retrieve the results.
+     *  \OxidEsales\Eshop\Core\Database\Adapter\Doctrine\Database::select uses executeQuery under the hood.
+     *  \OxidEsales\Eshop\Core\Database\Adapter\Doctrine\Database::selectLimit uses select under the hood.
      *
      * @covers \OxidEsales\Eshop\Core\Database\Adapter\Doctrine\Database::select
+     * @covers \OxidEsales\Eshop\Core\Database\Adapter\Doctrine\Database::selectLimit
      */
     public function testMasterSlaveConnectionReadsFromSlaveOnSelect()
     {
         /**
-         * Act
+         * Arrange
          */
         $expectedSlaveResult = '100';
 
+        /**
+         * Act
+         */
 
         /** Modify record directly on the slave database, bypassing master-slave replication */
         $this->slaveConnection->query('UPDATE `master_slave_table` SET `column1` = ' . $expectedSlaveResult . ' WHERE id = 1');
 
         /** @var \mysqli_result $resultSet Read directly from slave database */
-        list($resultSet, $row, $actualSlaveResult) = $this->readValueFromSlaveDb();
+        $actualSlaveResult = $this->readValueFromSlaveDb();
 
         /** @var \mysqli_result $resultSet Read directly from master database */
         $actualMasterResult = $this->readValueFromMasterDb();
@@ -299,7 +338,7 @@ class DatabaseTest extends UnitTestCase
          */
         $this->assertSame($expectedSlaveResult, $actualSlaveResult, 'Slave connection retrieves modified value ' . $expectedSlaveResult);
         $this->assertSame($this->expectedMasterResult, $actualMasterResult, 'Master connection retrieves unmodified value ' . $expectedSlaveResult);
-        $this->assertSame($expectedSlaveResult, $actualMasterSlaveResult, 'Master-Slave connection retrieves modified value ' . $expectedSlaveResult . ' from slave database');
+        $this->assertSame($expectedSlaveResult, $actualMasterSlaveResult, 'Master-Slave connection reads from slave database when using select()');
     }
 
     /**
@@ -316,30 +355,33 @@ class DatabaseTest extends UnitTestCase
     public function testMasterSlaveConnectionReadsFromMasterOnGetAll()
     {
         /**
-         * Act
+         * Arrange
          */
         $expectedSlaveResult = '100';
 
+        /**
+         * Act
+         */
 
         /** Modify record directly on the slave database, bypassing master-slave replication */
         $this->slaveConnection->query('UPDATE `master_slave_table` SET `column1` = ' . $expectedSlaveResult . ' WHERE id = 1');
 
         /** @var \mysqli_result $resultSet Read directly from slave database */
-        list($resultSet, $row, $actualSlaveResult) = $this->readValueFromSlaveDb();
+        $actualSlaveResult = $this->readValueFromSlaveDb();
 
         /** @var \mysqli_result $resultSet Read directly from master database */
         $actualMasterResult = $this->readValueFromMasterDb();
 
         /** Force picking the master by doing an execute here. Doctrine:executeUpdate is called under the hood */
         $this->masterSlaveConnection->execute('INSERT INTO `master_slave_table` (`column1`, `column2`) VALUES (2, 3)');
-        $actualMasterSlaveResult = $this->masterSlaveConnection->getAll('SELECT column1 FROM `master_slave_table` WHERE id = 1')['column1'];
+        $actualMasterSlaveResult = $this->masterSlaveConnection->getAll('SELECT column1 FROM `master_slave_table` WHERE id = 1')[0]['column1'];
 
         /**
          * Assert
          */
         $this->assertSame($expectedSlaveResult, $actualSlaveResult, 'Slave connection retrieves modified value ' . $expectedSlaveResult);
         $this->assertSame($this->expectedMasterResult, $actualMasterResult, 'Master connection retrieves unmodified value ' . $expectedSlaveResult);
-        $this->assertSame($expectedSlaveResult, $actualMasterSlaveResult, 'Master-Slave connection retrieves unmodified value ' . $this->expectedMasterResult . ' from master database');
+        $this->assertSame($this->expectedMasterResult, $actualMasterSlaveResult, 'Master-Slave connection reads from master database when using getAll() after execute()');
     }
 
     /**
@@ -356,16 +398,19 @@ class DatabaseTest extends UnitTestCase
     public function testMasterSlaveConnectionReadsFromMasterOnGetCol()
     {
         /**
-         * Act
+         * Arrange
          */
         $expectedSlaveResult = '100';
 
+        /**
+         * Act
+         */
 
         /** Modify record directly on the slave database, bypassing master-slave replication */
         $this->slaveConnection->query('UPDATE `master_slave_table` SET `column1` = ' . $expectedSlaveResult . ' WHERE id = 1');
 
         /** @var \mysqli_result $resultSet Read directly from slave database */
-        list($resultSet, $row, $actualSlaveResult) = $this->readValueFromSlaveDb();
+        $actualSlaveResult = $this->readValueFromSlaveDb();
 
         /** @var \mysqli_result $resultSet Read directly from master database */
         $actualMasterResult = $this->readValueFromMasterDb();
@@ -379,7 +424,50 @@ class DatabaseTest extends UnitTestCase
          */
         $this->assertSame($expectedSlaveResult, $actualSlaveResult, 'Slave connection retrieves modified value ' . $expectedSlaveResult);
         $this->assertSame($this->expectedMasterResult, $actualMasterResult, 'Master connection retrieves unmodified value ' . $expectedSlaveResult);
-        $this->assertSame($expectedSlaveResult, $actualMasterSlaveResult, 'Master-Slave connection retrieves modified value ' . $this->expectedMasterResult . ' from master database');
+        $this->assertSame($this->expectedMasterResult, $actualMasterSlaveResult, 'Master-Slave connection reads from master database when using getCol() after execute()');
+    }
+
+    /**
+     * Test Doctrine behavior:
+     * "Master is picked when 'exec', 'executeUpdate', 'insert', 'delete', 'update', 'createSavepoint', 'releaseSavepoint', 'beginTransaction', 'rollback', 'commit', 'query' or 'prepare' is called."
+     * "Use slave if master was never picked before and ONLY if 'getWrappedConnection' or 'executeQuery' is used."
+     *
+     * \OxidEsales\Eshop\Core\Database\Adapter\Doctrine\Database::getOne uses executeQuery under the hood to retrieve the results.
+     * Now picking the master is forced by using 'executeUpdate' and then the master should also be also used for
+     * \OxidEsales\Eshop\Core\Database\Adapter\Doctrine\Database::getOne
+     *
+     * @covers \OxidEsales\Eshop\Core\Database\Adapter\Doctrine\Database::getOne
+     */
+    public function testMasterSlaveConnectionReadsFromMasterOnGetOne()
+    {
+        /**
+         * Arrange
+         */
+        $expectedSlaveResult = '100';
+
+        /**
+         * Act
+         */
+
+        /** Modify record directly on the slave database, bypassing master-slave replication */
+        $this->slaveConnection->query('UPDATE `master_slave_table` SET `column1` = ' . $expectedSlaveResult . ' WHERE id = 1');
+
+        /** @var \mysqli_result $resultSet Read directly from slave database */
+        $actualSlaveResult = $this->readValueFromSlaveDb();
+
+        /** @var \mysqli_result $resultSet Read directly from master database */
+        $actualMasterResult = $this->readValueFromMasterDb();
+
+        /** Force picking the master by doing an execute here. Doctrine:executeUpdate is called under the hood */
+        $this->masterSlaveConnection->execute('INSERT INTO `master_slave_table` (`column1`, `column2`) VALUES (2, 3)');
+        $actualMasterSlaveResult = $this->masterSlaveConnection->getOne('SELECT column1 FROM `master_slave_table` WHERE id = 1');
+
+        /**
+         * Assert
+         */
+        $this->assertSame($expectedSlaveResult, $actualSlaveResult, 'Slave connection retrieves modified value ' . $expectedSlaveResult);
+        $this->assertSame($this->expectedMasterResult, $actualMasterResult, 'Master connection retrieves unmodified value ' . $expectedSlaveResult);
+        $this->assertSame($this->expectedMasterResult, $actualMasterSlaveResult, 'Master-Slave connection reads from master database when using getOne() after execute()');
     }
 
     /**
@@ -396,16 +484,19 @@ class DatabaseTest extends UnitTestCase
     public function testMasterSlaveConnectionReadsFromMasterOnGetRow()
     {
         /**
-         * Act
+         * Arrange
          */
         $expectedSlaveResult = '100';
 
+        /**
+         * Act
+         */
 
         /** Modify record directly on the slave database, bypassing master-slave replication */
         $this->slaveConnection->query('UPDATE `master_slave_table` SET `column1` = ' . $expectedSlaveResult . ' WHERE id = 1');
 
         /** @var \mysqli_result $resultSet Read directly from slave database */
-        list($resultSet, $row, $actualSlaveResult) = $this->readValueFromSlaveDb();
+        $actualSlaveResult = $this->readValueFromSlaveDb();
 
         /** @var \mysqli_result $resultSet Read directly from master database */
         $actualMasterResult = $this->readValueFromMasterDb();
@@ -419,7 +510,7 @@ class DatabaseTest extends UnitTestCase
          */
         $this->assertSame($expectedSlaveResult, $actualSlaveResult, 'Slave connection retrieves modified value ' . $expectedSlaveResult);
         $this->assertSame($this->expectedMasterResult, $actualMasterResult, 'Master connection retrieves unmodified value ' . $expectedSlaveResult);
-        $this->assertSame($expectedSlaveResult, $actualMasterSlaveResult, 'Master-Slave connection retrieves modified value ' . $expectedSlaveResult . ' from slave database');
+        $this->assertSame($this->expectedMasterResult, $actualMasterSlaveResult, 'Master-Slave connection reads from master database when using getRow() after execute()');
     }
 
     /**
@@ -436,16 +527,19 @@ class DatabaseTest extends UnitTestCase
     public function testMasterSlaveConnectionReadsFromMasterOnSelect()
     {
         /**
-         * Act
+         * Arrange
          */
         $expectedSlaveResult = '100';
 
+        /**
+         * Act
+         */
 
         /** Modify record directly on the slave database, bypassing master-slave replication */
         $this->slaveConnection->query('UPDATE `master_slave_table` SET `column1` = ' . $expectedSlaveResult . ' WHERE id = 1');
 
         /** @var \mysqli_result $resultSet Read directly from slave database */
-        list($resultSet, $row, $actualSlaveResult) = $this->readValueFromSlaveDb();
+        $actualSlaveResult = $this->readValueFromSlaveDb();
 
         /** @var \mysqli_result $resultSet Read directly from master database */
         $actualMasterResult = $this->readValueFromMasterDb();
@@ -460,8 +554,8 @@ class DatabaseTest extends UnitTestCase
          * Assert
          */
         $this->assertSame($expectedSlaveResult, $actualSlaveResult, 'Slave connection retrieves modified value ' . $expectedSlaveResult);
-        $this->assertSame($this->expectedSlaveResult, $actualMasterResult, 'Master connection retrieves unmodified value ' . $expectedSlaveResult);
-        $this->assertSame($expectedSlaveResult, $actualMasterSlaveResult, 'Master-Slave connection retrieves unmodified value ' . $this->expectedMasterResult . ' from master database');
+        $this->assertSame($this->expectedMasterResult, $actualMasterResult, 'Master connection retrieves unmodified value ' . $this->expectedMasterResult);
+        $this->assertSame($this->expectedMasterResult, $actualMasterSlaveResult, 'Master-Slave connection reads from master database when using select() after execute()');
     }
 
     /**
@@ -475,10 +569,13 @@ class DatabaseTest extends UnitTestCase
     public function testMasterSlaveConnectionReadsFromMasterDuringTransaction()
     {
         /**
-         * Act
+         * Arrange
          */
         $expectedSlaveResult = '100';
 
+        /**
+         * Act
+         */
 
         /** Modify record directly on the slave database, bypassing master-slave replication */
         $this->slaveConnection->query('UPDATE `master_slave_table` SET `column1` = ' . $expectedSlaveResult . ' WHERE id = 1');
@@ -502,7 +599,7 @@ class DatabaseTest extends UnitTestCase
          */
         $this->assertSame($expectedSlaveResult, $actualSlaveResult, 'Slave connection retrieves modified value ' . $expectedSlaveResult);
         $this->assertSame($this->expectedMasterResult, $actualMasterResult, 'Master connection retrieves unmodified value ' . $this->expectedMasterResult);
-        $this->assertSame($this->expectedMasterResult, $actualMasterSlaveResult, 'Master-Slave connection retrieves unmodified value ' . $this->expectedMasterResult . ' from master database');
+        $this->assertSame($this->expectedMasterResult, $actualMasterSlaveResult, 'Master-Slave connection reads from master database after using startTransaction()');
     }
 
     /**
@@ -516,10 +613,13 @@ class DatabaseTest extends UnitTestCase
     public function testMasterSlaveConnectionReadsFromMasterAfterCommitTransaction()
     {
         /**
-         * Act
+         * Arrange
          */
         $expectedSlaveResult = '100';
 
+        /**
+         * Act
+         */
 
         /** Start a transaction, do an update and commit it. */
         $this->masterSlaveConnection->startTransaction();
@@ -530,7 +630,7 @@ class DatabaseTest extends UnitTestCase
         $this->slaveConnection->query('UPDATE `master_slave_table` SET `column1` = ' . $expectedSlaveResult . ' WHERE id = 1');
 
         /** @var \mysqli_result $resultSet Read directly from slave database */
-        list($resultSet, $row, $actualSlaveResult) = $this->readValueFromSlaveDb();
+        $actualSlaveResult = $this->readValueFromSlaveDb();
 
         /** @var \mysqli_result $resultSet Read directly from master database */
         $actualMasterResult = $this->readValueFromMasterDb();
@@ -545,7 +645,7 @@ class DatabaseTest extends UnitTestCase
          */
         $this->assertSame($expectedSlaveResult, $actualSlaveResult, 'Slave connection retrieves modified value ' . $expectedSlaveResult);
         $this->assertSame($this->expectedMasterResult, $actualMasterResult, 'Master connection retrieves unmodified value ' . $this->expectedMasterResult);
-        $this->assertSame($this->expectedMasterResult, $actualMasterSlaveResult, 'Master-Slave connection retrieves unmodified value ' . $this->expectedMasterResult . ' from master database');
+        $this->assertSame($this->expectedMasterResult, $actualMasterSlaveResult, 'Master-Slave connection reads from master database after using commitTransaction()');
     }
 
     /**
@@ -562,18 +662,20 @@ class DatabaseTest extends UnitTestCase
     public function testMasterSlaveConnectionWritesToMasterOnExecute()
     {
         /**
-         * Act
+         * Arrange
          */
         $expectedSlaveResult = '100';
-
         $expectedMasterResultAfterExecute = '2';
 
+        /**
+         * Act
+         */
 
         /** Modify record directly on the slave database, bypassing master-slave replication */
         $this->slaveConnection->query('UPDATE `master_slave_table` SET `column1` = ' . $expectedSlaveResult . ' WHERE id = 1');
 
         /** @var \mysqli_result $resultSet Read directly from slave database */
-        list($resultSet, $row, $actualSlaveResult) = $this->readValueFromSlaveDb();
+        $actualSlaveResult = $this->readValueFromSlaveDb();
 
         /** @var \mysqli_result $resultSet Read directly from master database */
         $actualMasterResult = $this->readValueFromMasterDb();
@@ -582,7 +684,7 @@ class DatabaseTest extends UnitTestCase
         $resultSet = $this->masterSlaveConnection->select('SELECT column1 FROM `master_slave_table` WHERE id = 1');
         $actualMasterSlaveResult = $resultSet->fields['column1'];
 
-        $this->masterSlaveConnection->execute('INSERT INTO `master_slave_table` (`column1`, `column2`) VALUES (' . $this->expectedMasterResultAfterExecute . ', 3)');
+        $this->masterSlaveConnection->execute('INSERT INTO `master_slave_table` (`column1`, `column2`) VALUES (' . $expectedMasterResultAfterExecute . ', 3)');
 
         /** @var \mysqli_result $resultSet Read directly from master database */
         $resultSet = $this->masterConnection->query('SELECT column1 FROM `master_slave_table` WHERE id = 2');
@@ -595,7 +697,30 @@ class DatabaseTest extends UnitTestCase
         $this->assertSame($expectedSlaveResult, $actualSlaveResult, 'Slave connection retrieves modified value ' . $expectedSlaveResult);
         $this->assertSame($this->expectedMasterResult, $actualMasterResult, 'Master connection retrieves unmodified value ' . $expectedSlaveResult);
         $this->assertSame($expectedSlaveResult, $actualMasterSlaveResult, 'Master-Slave connection retrieves modified value ' . $expectedSlaveResult . ' from slave database on select');
-        $this->assertSame($expectedMasterResultAfterExecute, $actualMasterResultAfterExecute, 'Master-Slave connection writes new value ' . $this->expectedMasterResult . ' to master database');
+        $this->assertSame($expectedMasterResultAfterExecute, $actualMasterResultAfterExecute, 'Master-Slave connection writes new value ' . $this->expectedMasterResult . ' to master database using execute');
+    }
+
+    public function testMetaColumnsReadsFromMaster() {
+        /**
+         * Arrange
+         */
+        $expectedResult = $this->masterSlaveConnection->metaColumns('master_slave_table');
+
+        /**
+         * Modify the table on the slave database to see if the change is visible to metaColumns and thus the table
+         * definition is read from the slave instead of the master database
+         */
+        $this->slaveConnection->query('ALTER TABLE `master_slave_table`	ADD COLUMN `column3` INT NULL AFTER `column2`;');
+
+        /*
+         * Act
+         */
+        $actualResult = $this->masterSlaveConnection->metaColumns('master_slave_table');
+
+        /**
+         * Assert
+         */
+        $this->assertEquals($expectedResult, $actualResult);
     }
 
     /**
@@ -736,9 +861,28 @@ EOT;
      */
     protected function populateTestTable($expectedMasterResult)
     {
-        
+
         $this->masterConnection->query('INSERT INTO `master_slave_table` (`column1`, `column2`) VALUES (' . $expectedMasterResult . ', 2)');
         /** Pause to let replication take place */
         sleep(2);
+    }
+
+
+    /**
+     * Set a given protected property of a given class instance to a given value.
+     *
+     * @param object $classInstance Instance of the class of which the property will be set
+     * @param string $property      Name of the property to be set
+     * @param mixed  $value         Value to which the property will be set
+     */
+    protected function setProtectedClassProperty($classInstance, $property, $value)
+    {
+        $className = get_class($classInstance);
+
+        $reflectionClass = new \ReflectionClass($className);
+
+        $reflectionProperty = $reflectionClass->getProperty($property);
+        $reflectionProperty->setAccessible(true);
+        $reflectionProperty->setValue($classInstance, $value);
     }
 }
