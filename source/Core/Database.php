@@ -227,7 +227,7 @@ class Database
      */
     protected function setSqlMode()
     {
-        static::getDb()->executeSet('SET @@session.sql_mode = ""');
+        static::getDb()->executeSet('SET @@sql_mode = ""');
     }
 
     /**
