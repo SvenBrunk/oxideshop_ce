@@ -123,7 +123,7 @@ class Database implements DatabaseInterface
 
         try {
             $connection = DriverManager::getConnection($connectionParameters, $configuration);
-            $forceMaster ? $connection->connect('master') : $connection->connect();
+            $connection->connect();
             if (! $connection->isConnected()) {
                 $dsn = $connection->getDriver()->getName() .
                        '://' .
@@ -140,6 +140,19 @@ class Database implements DatabaseInterface
             $exception = $this->convertException($exception);
             $this->handleException($exception);
         }
+    }
+
+    /**
+     * Getter for master connection object.
+     *
+     * @return Connection
+     */
+    public function forceMasterConnection()
+    {
+        if (is_null($this->connection)) {
+            $this->connect();
+        }
+        $this->connection->connect('master');
     }
 
     /**
