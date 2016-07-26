@@ -229,7 +229,7 @@ class UtilsCount extends \oxSuperCfg
      * Returns the query result as a two dimensional associative array.
      * The keys of the first level are the firsts value of each row.
      * The values of the first level arrays with numeric key that hold the all the values of each row but the first one,
-     * which is used a a key in the first level.     
+     * which is used a a key in the first level.
      *
      * @param string $query
      * @param array  $parameters
@@ -330,8 +330,9 @@ class UtilsCount extends \oxSuperCfg
             $sTable = getViewName('oxcategories');
             $sSelect = "select $sTable.oxid from $sTable where " . (double) $iPrice . " >= $sTable.oxpricefrom and " . (double) $iPrice . " <= $sTable.oxpriceto ";
 
-            // We force reading from master to prevent issues with slow replications or open transactions (see ESDEV-3804).
-            $rs = oxDb::getMaster()->select($sSelect, false);
+            // Functionality is only used by shop admin.
+            // Admin always uses database master to prevent issues with slow replications or open transactions (see ESDEV-3804 and ESDEV-3822).
+            $rs = oxDb::getDb()->select($sSelect, false);
             if ($rs != false && $rs->count() > 0) {
                 while (!$rs->EOF) {
                     if (isset($aCatData[$rs->fields[0]])) {
