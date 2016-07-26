@@ -141,8 +141,8 @@ class CategoryMainAjax extends \ajaxListComponent
         $aArticles = $this->_getActionIds('oxarticles.oxid');
         $sCategoryID = $myConfig->getRequestParameter('synchoxid');
         $sShopID = $myConfig->getShopId();
-        // We force reading from master to prevent issues with slow replications or open transactions (see ESDEV-3804).
-        $masterDb = oxDb::getMaster();
+        // Admin always uses database master to prevent issues with slow replications or open transactions (see ESDEV-3804 and ESDEV-3822).
+        $database = oxDb::getDb();
         $sArticleTable = $this->_getViewName('oxarticles');
 
         // adding
@@ -163,9 +163,9 @@ class CategoryMainAjax extends \ajaxListComponent
 
                 // check, if it's already in, then don't add it again
                 $sSelect = "select 1 from $sO2CView as oxobject2category where oxobject2category.oxcatnid= "
-                           . $masterDb->quote($sCategoryID) . " and oxobject2category.oxobjectid = " . $masterDb->quote($sAdd) . "";
+                           . $database->quote($sCategoryID) . " and oxobject2category.oxobjectid = " . $database->quote($sAdd) . "";
                 // We force reading from master to prevent issues with slow replications or open transactions (see ESDEV-3804).
-                if ($masterDb->getOne($sSelect, false, false)) {
+                if ($database->getOne($sSelect, false, false)) {
                     continue;
                 }
 
@@ -179,7 +179,7 @@ class CategoryMainAjax extends \ajaxListComponent
                 if ($sProdIds) {
                     $sProdIds .= ",";
                 }
-                $sProdIds .= $masterDb->quote($sAdd);
+                $sProdIds .= $database->quote($sAdd);
             }
 
             // updating oxtime values

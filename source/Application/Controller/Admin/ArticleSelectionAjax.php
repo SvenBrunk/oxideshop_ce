@@ -69,8 +69,8 @@ class ArticleSelectionAjax extends \ajaxListComponent
         $sQ = "select oxparentid from {$sArtViewName} where oxid = " . $oDb->quote($sOxid) . " and oxparentid != '' ";
         $sQ .= "and (select count(oxobjectid) from oxobject2selectlist " .
                "where oxobjectid = " . $oDb->quote($sOxid) . ") = 0";
-        // We force reading from master to prevent issues with slow replications or open transactions (see ESDEV-3804).
-        $sParentId = oxDb::getMaster()->getOne($sQ);
+        // Admin always uses database master to prevent issues with slow replications or open transactions (see ESDEV-3804 and ESDEV-3822).
+        $sParentId = oxDb::getDb()->getOne($sQ);
 
         // all selectlists article is in
         $sQAdd = " from oxobject2selectlist left join {$sSLViewName} " .
@@ -124,8 +124,8 @@ class ArticleSelectionAjax extends \ajaxListComponent
         }
 
         if ($soxId && $soxId != "-1" && is_array($aAddSel)) {
-            // We force reading from master to prevent issues with slow replications or open transactions (see ESDEV-3804).
-            $masterDb = oxDb::getMaster();
+            // Admin always uses database master to prevent issues with slow replications or open transactions (see ESDEV-3804 and ESDEV-3822).
+            $database = oxDb::getDb();
             foreach ($aAddSel as $sAdd) {
                 $oNew = oxNew("oxBase");
                 $oNew->init("oxobject2selectlist");
@@ -134,9 +134,9 @@ class ArticleSelectionAjax extends \ajaxListComponent
                 $sOxSortField = 'oxobject2selectlist__oxsort';
                 $oNew->$sObjectIdField = new oxField($soxId);
                 $oNew->$sSelectetionIdField = new oxField($sAdd);
-                $sSql = "select max(oxsort) + 1 from oxobject2selectlist where oxobjectid =  {$masterDb->quote($soxId)} ";
-                // We force reading from master to prevent issues with slow replications or open transactions (see ESDEV-3804).
-                $oNew->$sOxSortField = new oxField(( int ) $masterDb->getOne($sSql));
+                $sSql = "select max(oxsort) + 1 from oxobject2selectlist where oxobjectid =  {$database->quote($soxId)} ";
+                // Admin always uses database master to prevent issues with slow replications or open transactions (see ESDEV-3804 and ESDEV-3822).
+                $oNew->$sOxSortField = new oxField(( int ) $database->getOne($sSql));
                 $oNew->save();
             }
 

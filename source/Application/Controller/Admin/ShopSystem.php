@@ -66,9 +66,9 @@ class ShopSystem extends \Shop_Config
             $soxId = $myConfig->getShopId();
         }
 
-        // We force reading from master to prevent issues with slow replications or open transactions (see ESDEV-3804).
-        $masterDb = oxDb::getMaster();
-        $sShopCountry = $masterDb->getOne("select DECODE( oxvarvalue, " . $masterDb->quote($myConfig->getConfigParam('sConfigKey')) . ") as oxvarvalue from oxconfig where oxshopid = '$soxId' and oxvarname = 'sShopCountry'");
+        // Admin always uses database master to prevent issues with slow replications or open transactions (see ESDEV-3804 and ESDEV-3822).
+        $database = oxDb::getDb();
+        $sShopCountry = $database->getOne("select DECODE( oxvarvalue, " . $database->quote($myConfig->getConfigParam('sConfigKey')) . ") as oxvarvalue from oxconfig where oxshopid = '$soxId' and oxvarname = 'sShopCountry'");
 
         $this->_aViewData["shop_countries"] = $aLocationCountries[$sLangAbbr];
         $this->_aViewData["confstrs"]["sShopCountry"] = $sShopCountry;

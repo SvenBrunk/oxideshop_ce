@@ -235,16 +235,16 @@ class ContentMain extends \oxAdminDetails
      */
     protected function _checkIdent($sIdent, $sOxId)
     {
-        // We force reading from master to prevent issues with slow replications or open transactions (see ESDEV-3804).
-        $masterDb = oxDb::getMaster();
-        
+        // Admin always uses database master to prevent issues with slow replications or open transactions (see ESDEV-3804 and ESDEV-3822).
+        $database = oxDb::getDb();
+
         $blAllow = false;
-        
+
         // null not allowed
         if (!strlen($sIdent)) {
             $blAllow = true;
         // We force reading from master to prevent issues with slow replications or open transactions (see ESDEV-3804).
-        } elseif ($masterDb->getOne("select oxid from oxcontents where oxloadid = " . $masterDb->quote($sIdent) . " and oxid != " . $masterDb->quote($sOxId) . " and oxshopid = '" . $this->getConfig()->getShopId() . "'")) {
+        } elseif ($database->getOne("select oxid from oxcontents where oxloadid = " . $database->quote($sIdent) . " and oxid != " . $database->quote($sOxId) . " and oxshopid = '" . $this->getConfig()->getShopId() . "'")) {
             $blAllow = true;
         }
 

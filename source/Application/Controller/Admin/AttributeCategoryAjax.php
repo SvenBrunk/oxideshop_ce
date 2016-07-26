@@ -130,8 +130,8 @@ class AttributeCategoryAjax extends \ajaxListComponent
         }
 
         if ($oAttribute->load($soxId) && is_array($aAddCategory)) {
-            // We force reading from master to prevent issues with slow replications or open transactions (see ESDEV-3804).
-            $masterDb = oxDb::getMaster();
+            // Admin always uses database master to prevent issues with slow replications or open transactions (see ESDEV-3804 and ESDEV-3822).
+            $database = oxDb::getDb();
             foreach ($aAddCategory as $sAdd) {
                 $oNewGroup = oxNew("oxBase");
                 $oNewGroup->init("oxcategory2attribute");
@@ -143,7 +143,7 @@ class AttributeCategoryAjax extends \ajaxListComponent
                 $oNewGroup->$sAttributeIdField = new oxField($oAttribute->$sOxIdField->value);
                 $sSql = "select max(oxsort) + 1 from oxcategory2attribute where oxobjectid = '$sAdd' ";
                 // We force reading from master to prevent issues with slow replications or open transactions (see ESDEV-3804).
-                $oNewGroup->$sOxSortField = new oxField(( int ) $masterDb->getOne($sSql));
+                $oNewGroup->$sOxSortField = new oxField(( int ) $database->getOne($sSql));
                 $oNewGroup->save();
             }
         }

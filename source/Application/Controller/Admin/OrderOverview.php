@@ -200,12 +200,12 @@ class OrderOverview extends \oxAdminDetails
         $oModule = oxNew('oxmodule');
         $oModule->load('invoicepdf');
         if ($oModule->isActive()) {
-            // We force reading from master to prevent issues with slow replications or open transactions (see ESDEV-3804).
-            $masterDb = oxDb::getMaster();
+            // Admin always uses database master to prevent issues with slow replications or open transactions (see ESDEV-3804 and ESDEV-3822).
+            $database = oxDb::getDb();
             $sOrderId = $this->getEditObjectId();
             $sTable = getViewName("oxorderarticles");
-            $sQ = "select count(oxid) from {$sTable} where oxorderid = " . $masterDb->quote($sOrderId) . " and oxstorno = 0";
-            $blCan = (bool) $masterDb->getOne($sQ);
+            $sQ = "select count(oxid) from {$sTable} where oxorderid = " . $database->quote($sOrderId) . " and oxstorno = 0";
+            $blCan = (bool) $database->getOne($sQ);
         }
 
         return $blCan;

@@ -513,8 +513,8 @@ class ListComponentAjax extends \oxSuperCfg
 
         // $sCountCacheKey = md5( $sQ );
 
-        // We force reading from master to prevent issues with slow replications or open transactions (see ESDEV-3804).
-        return (int) oxDb::getMaster()->getOne($sQ);
+        // Admin always uses database master to prevent issues with slow replications or open transactions (see ESDEV-3804 and ESDEV-3822).
+        return (int) oxDb::getDb()->getOne($sQ);
     }
 
     /**
@@ -526,8 +526,8 @@ class ListComponentAjax extends \oxSuperCfg
      */
     protected function _getDataFields($sQ)
     {
-        // We force reading from master to prevent issues with slow replications or open transactions (see ESDEV-3804).
-        return oxDb::getMaster(oxDB::FETCH_MODE_ASSOC)->getAll($sQ, false);
+        // Admin always uses database master to prevent issues with slow replications or open transactions (see ESDEV-3804 and ESDEV-3822).
+        return oxDb::getDb(oxDB::FETCH_MODE_ASSOC)->getAll($sQ, false);
     }
 
     /**
