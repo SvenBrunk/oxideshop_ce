@@ -162,12 +162,12 @@ class UtilsPic extends \oxSuperCfg
      */
     protected function fetchIsImageDeletable($sPicName, $sTable, $sField)
     {
-        // We force reading from master to prevent issues with slow replications or open transactions (see ESDEV-3804).
-        $masterDb = oxDb::getMaster();
+        //Only called from admin context (see ESDEV-3804 and ESDEV-3822).
+        $database = oxDb::getDb();
 
-        $query = "select count(*) from $sTable where $sField = " . $masterDb->quote($sPicName) . " group by $sField ";
+        $query = "select count(*) from $sTable where $sField = " . $$database->quote($sPicName) . " group by $sField ";
 
-        return $masterDb->getOne($query);
+        return $database->getOne($query);
     }
 
     /**
