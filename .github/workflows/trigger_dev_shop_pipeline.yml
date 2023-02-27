@@ -1,0 +1,14 @@
+name: Trigger dev cloud shop
+
+on:
+  push:
+    branches:
+      - b-7.0.x
+
+jobs:
+  trigger_cloud_deploy:
+    runs-on: curlimages/curl
+    steps:
+      - name: Trigger GitLab pipeline
+        run: |
+          curl -X POST --fail -F token=${{ secrets.GITLAB_API_TOKEN }} -F ref=main https://gitlab.com/api/v4/projects/32085232/trigger/pipeline
